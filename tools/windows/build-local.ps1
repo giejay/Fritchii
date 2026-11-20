@@ -137,10 +137,19 @@ $buildArgs = @("--build", $BuildDir, "--parallel", $Jobs)
 if ($Target) {
     $buildArgs += @("--target", $Target)
 }
-Write-Host "build-local: building with $Jobs jobs"
-& cmake @buildArgs
-if ($LASTEXITCODE -ne 0) {
-    Fail "build failed (see the first 'error' above)."
+$logFile = Join-Path (Resolve-Path $BuildDir) "build-local.log"
+Write-Host "build-local: building with $Jobs jobs (full output also in $logFile)"
+# Native stderr becomes error records in Windows PowerShell; don't let that stop the script.
+$ErrorActionPreference = "Continue"
+& cmake @buildArgs 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath $logFile
+$buildExit = $LASTEXITCODE
+$ErrorActionPreference = "Stop"
+if ($buildExit -ne 0) {
+    Write-Host ""
+    Write-Host "build-local: errors (first 30 lines):" -ForegroundColor Red
+    Select-String -Path $logFile -Pattern "FAILED:|error:|error C\d+|error LNK|fatal error|undefined symbol" |
+        Select-Object -First 30 | ForEach-Object { Write-Host "  $($_.Line)" }
+    Fail "build failed. Full output: $logFile"
 }
 
 $binDir = Join-Path (Resolve-Path $BuildDir) "bin"
