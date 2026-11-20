@@ -22,7 +22,8 @@ class InputSubsystem;
 }
 
 /// Opened with L + R + Start: a full-window overlay that picks the player slot and profile for
-/// the controller that pressed it. That controller drives it (D-pad, A to confirm, B to cancel);
+/// the controller that pressed it. That controller drives it (D-pad picks the player, LB/RB the
+/// profile, A confirms, B cancels);
 /// mouse and keyboard work too.
 class ControllerAssignDialog : public QDialog {
 public:
@@ -39,10 +40,11 @@ protected:
     void keyPressEvent(QKeyEvent* event) override;
 
 private:
-    enum class Row { Player, Profile, Buttons };
+    enum class Row { Player, Buttons };
 
     void PollController();
     void Move(int dx, int dy);
+    void ChangeProfile(int delta);
     void Activate();
     void UpdateView();
 

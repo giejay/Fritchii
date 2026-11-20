@@ -17,7 +17,7 @@ namespace InputCommon {
 class InputSubsystem;
 
 /// Buttons a controller sends to the controller assignment window.
-enum class MenuButton { Up, Down, Left, Right, Accept, Back };
+enum class MenuButton { Up, Down, Left, Right, Accept, Back, PreviousPage, NextPage };
 
 /**
  * Automatically assigns connected game controllers (SDL devices) to player slots.

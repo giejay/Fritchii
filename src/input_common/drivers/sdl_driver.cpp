@@ -616,6 +616,12 @@ void SDLDriver::HandleGamepadButtonDown(const std::shared_ptr<SDLJoystick>& joys
         case SDL_GAMEPAD_BUTTON_EAST:
             menu_buttons.push_back(MenuButton::Back);
             break;
+        case SDL_GAMEPAD_BUTTON_LEFT_SHOULDER:
+            menu_buttons.push_back(MenuButton::PreviousPage);
+            break;
+        case SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER:
+            menu_buttons.push_back(MenuButton::NextPage);
+            break;
         default:
             break;
         }

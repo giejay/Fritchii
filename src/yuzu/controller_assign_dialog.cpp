@@ -86,10 +86,7 @@ ControllerAssignDialog::ControllerAssignDialog(InputCommon::InputSubsystem& inpu
     profile_box = new QPushButton;
     profile_box->setObjectName(QStringLiteral("assignProfile"));
     profile_box->setFocusPolicy(Qt::NoFocus);
-    connect(profile_box, &QPushButton::clicked, this, [this] {
-        row = Row::Profile;
-        Move(1, 0);
-    });
+    connect(profile_box, &QPushButton::clicked, this, [this] { ChangeProfile(1); });
 
     confirm_button = new QPushButton(tr("Ⓐ  Confirm"));
     cancel_button = new QPushButton(tr("Ⓑ  Cancel"));
@@ -104,7 +101,7 @@ ControllerAssignDialog::ControllerAssignDialog(InputCommon::InputSubsystem& inpu
     auto* players_label = new QLabel(tr("Player"));
     players_label->setObjectName(QStringLiteral("assignSection"));
 
-    auto* hint = new QLabel(tr("D-pad: move    Ⓐ: confirm    Ⓑ: cancel"));
+    auto* hint = new QLabel(tr("D-pad: player    LB / RB: profile    Ⓐ: confirm    Ⓑ: cancel"));
     hint->setObjectName(QStringLiteral("assignHint"));
     hint->setAlignment(Qt::AlignCenter);
 
@@ -235,6 +232,14 @@ void ControllerAssignDialog::keyPressEvent(QKeyEvent* event) {
     case Qt::Key_Escape:
         reject();
         break;
+    case Qt::Key_Q:
+    case Qt::Key_PageUp:
+        ChangeProfile(-1);
+        break;
+    case Qt::Key_E:
+    case Qt::Key_PageDown:
+        ChangeProfile(1);
+        break;
     default:
         QDialog::keyPressEvent(event);
     }
@@ -250,25 +255,23 @@ void ControllerAssignDialog::Move(int dx, int dy) {
         } else if (dy > 0 && player < 4) {
             player += 4;
         } else if (dy > 0) {
-            row = Row::Profile;
-        }
-        break;
-    case Row::Profile:
-        if (dx != 0) {
-            const int count = static_cast<int>(profiles.size());
-            profile = (profile + dx + count) % count;
-        } else {
-            row = dy < 0 ? Row::Player : Row::Buttons;
+            row = Row::Buttons;
         }
         break;
     case Row::Buttons:
         if (dx != 0) {
             button = button == 0 ? 1 : 0;
         } else if (dy < 0) {
-            row = Row::Profile;
+            row = Row::Player;
         }
         break;
     }
+    UpdateView();
+}
+
+void ControllerAssignDialog::ChangeProfile(int delta) {
+    const int count = static_cast<int>(profiles.size());
+    profile = (profile + delta + count) % count;
     UpdateView();
 }
 
@@ -292,10 +295,10 @@ void ControllerAssignDialog::UpdateView() {
                   i == player && row == Row::Player);
     }
     const bool many = profiles.size() > 1;
-    profile_box->setText((many ? QStringLiteral("◀   ") : QString{}) +
+    profile_box->setText((many ? QStringLiteral("LB  ◀     ") : QString{}) +
                          profiles[static_cast<std::size_t>(profile)].first +
-                         (many ? QStringLiteral("   ▶") : QString{}));
-    set_state(profile_box, false, row == Row::Profile);
+                         (many ? QStringLiteral("     ▶  RB") : QString{}));
+    set_state(profile_box, false, false);
     set_state(confirm_button, button == 0, row == Row::Buttons && button == 0);
     set_state(cancel_button, button == 1, row == Row::Buttons && button == 1);
 }
@@ -323,6 +326,12 @@ void ControllerAssignDialog::PollController() {
         case InputCommon::MenuButton::Back:
             reject();
             return;
+        case InputCommon::MenuButton::PreviousPage:
+            ChangeProfile(-1);
+            break;
+        case InputCommon::MenuButton::NextPage:
+            ChangeProfile(1);
+            break;
         }
     }
 }
