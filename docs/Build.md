@@ -35,3 +35,10 @@ renamed later). See the root `CMakeLists.txt` for the other options.
 - Read the first error CMake prints; most failures are a missing tool or a wrong Qt path.
 
 See [Caveats](Caveats.md) for platform quirks.
+
+## One-command local build
+
+`build-windows.cmd` in the repository root (a wrapper for `tools/windows/build-local.ps1`) loads the
+Visual Studio environment, finds the Vulkan SDK, configures with Ninja (clang-cl when installed,
+otherwise MSVC, Qt downloaded automatically) and builds into `build/bin`. Options:
+`-BuildType RelWithDebInfo`, `-Compiler msvc`, `-Target yuzu`, `-Clean`.
