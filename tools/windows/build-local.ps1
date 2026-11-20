@@ -126,9 +126,12 @@ $configureArgs = @(
 if ($Compiler -eq "clang-cl") {
     # With ENABLE_WERROR off the project passes -Wall, which clang-cl treats as -Weverything:
     # hundreds of warnings per file make the build much slower. /w silences warnings (errors stay).
+    # _USE_STD_VECTOR_ALGORITHMS=0: the VS 2026 STL sends std::find on 12/16-byte structs that
+    # clang reports as trivially comparable into its vectorized path, which static_asserts
+    # "unexpected size" (seen in shader_recompiler).
     $configureArgs += @(
         "-DCMAKE_C_FLAGS=/DWIN32 /D_WINDOWS /w",
-        "-DCMAKE_CXX_FLAGS=/DWIN32 /D_WINDOWS /EHsc /w"
+        "-DCMAKE_CXX_FLAGS=/DWIN32 /D_WINDOWS /EHsc /w /D_USE_STD_VECTOR_ALGORITHMS=0"
     )
 }
 if (Get-Command sccache -ErrorAction SilentlyContinue) {
@@ -179,6 +182,8 @@ $buildArgs = @("--build", $BuildDir, "--parallel", $Jobs)
 if ($Target) {
     $buildArgs += @("--target", $Target)
 }
+# Keep compiling the other files after an error, so one run shows every failing file.
+$buildArgs += @("--", "-k", "0")
 Write-Host "build-local: building with $Jobs jobs (full output in $logFile)"
 if ((Invoke-Quiet $buildArgs $logFile) -ne 0) {
     Show-Errors $logFile
