@@ -127,28 +127,53 @@ if (Get-Command sccache -ErrorAction SilentlyContinue) {
     $configureArgs += @("-DCMAKE_C_COMPILER_LAUNCHER=sccache", "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
 }
 
+New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
+$configureLog = Join-Path (Resolve-Path $BuildDir) "configure.log"
+$logFile = Join-Path (Resolve-Path $BuildDir) "build-local.log"
+$errorPattern = "FAILED:|error:|error C\d+|error LNK|fatal error|undefined symbol|CMake Error"
+
+$lineWidth = 100
+try { $lineWidth = [Math]::Max(40, $Host.UI.RawUI.WindowSize.Width - 1) } catch {}
+
+# Runs a command, writes everything to $Log and shows only ninja's [n/total] progress on one line
+# plus error lines. Native stderr becomes error records in Windows PowerShell, so the output is
+# turned into plain strings and the error preference relaxed while it runs.
+function Invoke-Quiet([string[]]$Arguments, [string]$Log) {
+    $ErrorActionPreference = "Continue"
+    & cmake @Arguments 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath $Log | ForEach-Object {
+        if ($_ -match '^\[(\d+)/(\d+)\]\s*(.*)$') {
+            $text = "[$($matches[1])/$($matches[2])] $($matches[3])"
+            if ($text.Length -gt $lineWidth) { $text = $text.Substring(0, $lineWidth) }
+            Write-Host -NoNewline ("`r" + $text.PadRight($lineWidth))
+        } elseif ($_ -match $errorPattern) {
+            Write-Host ""
+            Write-Host $_ -ForegroundColor Red
+        }
+    }
+    $code = $LASTEXITCODE
+    Write-Host ""
+    return $code
+}
+
+function Show-Errors([string]$Log) {
+    Write-Host "build-local: errors (first 30 lines):" -ForegroundColor Red
+    Select-String -Path $Log -Pattern $errorPattern | Select-Object -First 30 |
+        ForEach-Object { Write-Host "  $($_.Line)" }
+}
+
 Write-Host "build-local: configuring (the first run downloads dependencies and takes a while)"
-& cmake @configureArgs
-if ($LASTEXITCODE -ne 0) {
-    Fail "configure failed. If it keeps failing, try -Clean, or delete .cache\cpm."
+if ((Invoke-Quiet $configureArgs $configureLog) -ne 0) {
+    Show-Errors $configureLog
+    Fail "configure failed. Full output: $configureLog. If it keeps failing, try -Clean, or delete .cache\cpm."
 }
 
 $buildArgs = @("--build", $BuildDir, "--parallel", $Jobs)
 if ($Target) {
     $buildArgs += @("--target", $Target)
 }
-$logFile = Join-Path (Resolve-Path $BuildDir) "build-local.log"
-Write-Host "build-local: building with $Jobs jobs (full output also in $logFile)"
-# Native stderr becomes error records in Windows PowerShell; don't let that stop the script.
-$ErrorActionPreference = "Continue"
-& cmake @buildArgs 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath $logFile
-$buildExit = $LASTEXITCODE
-$ErrorActionPreference = "Stop"
-if ($buildExit -ne 0) {
-    Write-Host ""
-    Write-Host "build-local: errors (first 30 lines):" -ForegroundColor Red
-    Select-String -Path $logFile -Pattern "FAILED:|error:|error C\d+|error LNK|fatal error|undefined symbol" |
-        Select-Object -First 30 | ForEach-Object { Write-Host "  $($_.Line)" }
+Write-Host "build-local: building with $Jobs jobs (full output in $logFile)"
+if ((Invoke-Quiet $buildArgs $logFile) -ne 0) {
+    Show-Errors $logFile
     Fail "build failed. Full output: $logFile"
 }
 
