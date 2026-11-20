@@ -6,8 +6,11 @@
 #include <memory>
 #include <QWidget>
 
+class QCheckBox;
 class QColor;
+class QComboBox;
 class QPushButton;
+class QSpinBox;
 
 namespace Ui {
 class ConfigureInputAdvanced;
@@ -42,8 +45,13 @@ private:
     void OnControllerButtonClick(std::size_t player_idx, std::size_t button_idx);
 
     void LoadConfiguration();
+    void SetupAutoAssignUI();
 
     std::unique_ptr<Ui::ConfigureInputAdvanced> ui;
+
+    QCheckBox* auto_assign_enabled{};
+    QComboBox* auto_assign_profile{};
+    QSpinBox* auto_assign_max_players{};
 
     std::array<std::array<QColor, 4>, 8> controllers_colors;
     std::array<std::array<QPushButton*, 4>, 8> controllers_color_buttons;

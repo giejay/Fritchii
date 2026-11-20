@@ -54,6 +54,11 @@ public:
 
     std::vector<Common::ParamPackage> GetInputDevices() const override;
 
+    /// Returns a counter that is incremented every time a controller is connected or removed.
+    u64 GetDeviceGeneration() const {
+        return device_generation.load(std::memory_order_acquire);
+    }
+
     ButtonMapping GetButtonMappingForDevice(const Common::ParamPackage& params) override;
     AnalogMapping GetAnalogMappingForDevice(const Common::ParamPackage& params) override;
     MotionMapping GetMotionMappingForDevice(const Common::ParamPackage& params) override;
@@ -118,6 +123,7 @@ private:
     std::mutex joystick_map_mutex;
 
     std::atomic<bool> initialized = false;
+    std::atomic<u64> device_generation = 0;
     bool start_thread;
 };
 } // namespace InputCommon

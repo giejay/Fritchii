@@ -196,6 +196,7 @@ static FileSys::VirtualFile VfsDirectoryCreateFileWrapper(const FileSys::Virtual
 // Input //
 #include "hid_core/frontend/emulated_controller.h"
 #include "hid_core/hid_core.h"
+#include "input_common/helpers/auto_assign.h"
 #include "input_common/drivers/virtual_amiibo.h"
 
 // Video Core //
@@ -2569,6 +2570,7 @@ void MainWindow::BootGame(const QString& filename, Service::AM::FrontendAppletPa
                                           ? Common::FS::PathToUTF8String(file_path.filename())
                                           : fmt::format("{:016X}", title_id);
         QtConfig per_game_config(config_file_name, Config::ConfigType::PerGameConfig);
+        UpdateControllerAutoAssign(true);
         QtCommon::system->HIDCore().ReloadInputDevices();
         QtCommon::system->ApplySettings();
     }
@@ -2991,6 +2993,7 @@ void MainWindow::OnEmulationStopped() {
     game_list->setEnabled(true);
 
     Settings::RestoreGlobalState(QtCommon::system->IsPoweredOn());
+    UpdateControllerAutoAssign(true);
     QtCommon::system->HIDCore().ReloadInputDevices();
     UpdateStatusButtons();
     LOG_INFO(Frontend, "Emulation cleanup completed");
@@ -6144,6 +6147,25 @@ void MainWindow::UpdateInputDrivers() {
     if (!input_subsystem)
         return;
     input_subsystem->PumpEvents();
+    UpdateControllerAutoAssign(false);
+}
+
+void MainWindow::UpdateControllerAutoAssign(bool force) {
+    if (!input_subsystem || !Settings::values.auto_assign_controllers.GetValue()) {
+        return;
+    }
+    const u64 generation = input_subsystem->GetDeviceGeneration();
+    if (!force && generation == input_device_generation) {
+        return;
+    }
+    // Don't change bindings underneath an open configuration dialog; retry once it closes.
+    if (QApplication::activeModalWidget() != nullptr) {
+        return;
+    }
+    input_device_generation = generation;
+    if (InputCommon::AutoAssignControllers(*input_subsystem)) {
+        QtCommon::system->HIDCore().ReloadInputDevices();
+    }
 }
 
 void MainWindow::HideMouseCursor() {

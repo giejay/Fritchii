@@ -330,6 +330,14 @@ struct InputSubsystem::Impl {
 #endif
     }
 
+    u64 GetDeviceGeneration() const {
+#ifdef HAVE_SDL3
+        return sdl ? sdl->GetDeviceGeneration() : 0;
+#else
+        return 0;
+#endif
+    }
+
     void RegisterInput(const MappingData& data) {
         mapping_factory->RegisterInput(data);
     }
@@ -489,6 +497,10 @@ void InputSubsystem::StopMapping() const {
 
 void InputSubsystem::PumpEvents() const {
     impl->PumpEvents();
+}
+
+u64 InputSubsystem::GetDeviceGeneration() const {
+    return impl->GetDeviceGeneration();
 }
 
 std::string GenerateKeyboardParam(int key_code) {
