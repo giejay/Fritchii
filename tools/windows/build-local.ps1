@@ -28,6 +28,10 @@ param(
 
     [int]$Jobs = [Environment]::ProcessorCount,
 
+    # Qt 6.8.3 for MSVC 2022 x64 (the folder containing lib\cmake\Qt6). Empty = look in the usual
+    # places, and install it into .cache\qt with aqtinstall (Python) when it isn't there.
+    [string]$QtDir = "",
+
     # Delete the build directory first (needed after switching compiler).
     [switch]$Clean
 )
@@ -114,6 +118,42 @@ if (Test-Path $cache) {
     }
 }
 
+# Qt: the shared Qt 6.8.3 the releases use. The Qt CMake downloads by default on Windows is a
+# static build without the SVG module, so the Fritchii UI would have no icons.
+$QtVersion = "6.8.3"
+$qtCandidates = @($QtDir, $env:QT_DIR, "C:\Qt\$QtVersion\msvc2022_64",
+    (Join-Path $RepoRoot ".cache\qt\$QtVersion\msvc2022_64"))
+$QtDir = $qtCandidates | Where-Object { $_ -and (Test-Path (Join-Path $_ "lib\cmake\Qt6")) } |
+    Select-Object -First 1
+if (-not $QtDir) {
+    $python = @("py", "python") | Where-Object { Get-Command $_ -ErrorAction SilentlyContinue } |
+        Select-Object -First 1
+    if (-not $python) {
+        Fail ("Qt $QtVersion not found. Install Python (winget install -e --id Python.Python.3.12) " +
+              "so the script can download Qt, or install Qt $QtVersion 'MSVC 2022 64-bit' with the " +
+              "Qt installer and pass -QtDir C:\Qt\$QtVersion\msvc2022_64.")
+    }
+    $qtRoot = Join-Path $RepoRoot ".cache\qt"
+    Write-Host "build-local: downloading Qt $QtVersion into $qtRoot (one time)"
+    $ErrorActionPreference = "Continue"
+    & $python -m pip install --user --quiet --upgrade aqtinstall 2>&1 | Out-Null
+    & $python -m aqt install-qt windows desktop $QtVersion win64_msvc2022_64 -m qtcharts -O $qtRoot 2>&1 |
+        ForEach-Object { "$_" } | Select-String -Pattern "ERROR|Finished" | ForEach-Object { Write-Host "  $_" }
+    $ErrorActionPreference = "Stop"
+    $QtDir = Join-Path $qtRoot "$QtVersion\msvc2022_64"
+    if (-not (Test-Path (Join-Path $QtDir "lib\cmake\Qt6"))) {
+        Fail "Qt download failed. Install Qt $QtVersion 'MSVC 2022 64-bit' yourself and pass -QtDir."
+    }
+}
+Write-Host "build-local: Qt: $QtDir"
+
+# A build folder configured with the bundled (static) Qt keeps pointing at it; reconfigure fresh.
+if ((Test-Path $cache) -and (Select-String -Path $cache -Pattern "^YUZU_USE_BUNDLED_QT:BOOL=ON" -Quiet)) {
+    Write-Host "build-local: switching from the bundled Qt, resetting the CMake cache"
+    Remove-Item -Force $cache
+    Remove-Item -Recurse -Force (Join-Path $BuildDir "CMakeFiles") -ErrorAction SilentlyContinue
+}
+
 $configureArgs = @(
     "-S", ".", "-B", $BuildDir, "-G", "Ninja",
     "-DCMAKE_BUILD_TYPE=$BuildType",
@@ -121,7 +161,10 @@ $configureArgs = @(
     "-DCMAKE_CXX_COMPILER=$cc",
     "-DYUZU_TESTS=OFF",
     "-DENABLE_WERROR=OFF",
-    "-DENABLE_QT_TRANSLATION=OFF"
+    "-DENABLE_QT_TRANSLATION=OFF",
+    "-DYUZU_USE_BUNDLED_QT=OFF",
+    "-DCMAKE_PREFIX_PATH=$QtDir",
+    "-DQt6_DIR=$QtDir\lib\cmake\Qt6"
 )
 if ($Compiler -eq "clang-cl") {
     # With ENABLE_WERROR off the project passes -Wall, which clang-cl treats as -Weverything:

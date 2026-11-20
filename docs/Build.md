@@ -39,6 +39,7 @@ See [Caveats](Caveats.md) for platform quirks.
 ## One-command local build
 
 `build-windows.cmd` in the repository root (a wrapper for `tools/windows/build-local.ps1`) loads the
-Visual Studio environment, finds the Vulkan SDK, configures with Ninja (clang-cl when installed,
-otherwise MSVC, Qt downloaded automatically) and builds into `build/bin`. Options:
-`-BuildType RelWithDebInfo`, `-Compiler msvc`, `-Target yuzu`, `-Clean`.
+Visual Studio environment, finds the Vulkan SDK, configures with Ninja (the compiler must be clang-cl unless `-Compiler msvc` is given) and builds into `build/bin`. It uses
+the shared Qt 6.8.3 the releases use, from `C:\Qt\6.8.3\msvc2022_64`, `-QtDir`, or downloaded
+once into `.cache\qt` with aqtinstall (needs Python). Options: `-BuildType RelWithDebInfo`,
+`-Compiler msvc`, `-Target yuzu`, `-QtDir <path>`, `-Clean`.
