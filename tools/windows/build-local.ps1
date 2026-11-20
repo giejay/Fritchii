@@ -123,6 +123,14 @@ $configureArgs = @(
     "-DENABLE_WERROR=OFF",
     "-DENABLE_QT_TRANSLATION=OFF"
 )
+if ($Compiler -eq "clang-cl") {
+    # With ENABLE_WERROR off the project passes -Wall, which clang-cl treats as -Weverything:
+    # hundreds of warnings per file make the build much slower. /w silences warnings (errors stay).
+    $configureArgs += @(
+        "-DCMAKE_C_FLAGS=/DWIN32 /D_WINDOWS /w",
+        "-DCMAKE_CXX_FLAGS=/DWIN32 /D_WINDOWS /EHsc /w"
+    )
+}
 if (Get-Command sccache -ErrorAction SilentlyContinue) {
     $configureArgs += @("-DCMAKE_C_COMPILER_LAUNCHER=sccache", "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
 }
