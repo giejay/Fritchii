@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright 2026 Fritchii Project
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Local Windows build of Fritchii (Qt app + eden-cli).
+# Local Windows build of Fritchii (fritchii.exe and the small lichii.exe forwarder).
 #
 # Requirements (one-time):
 #   - Visual Studio 2022 or newer with "Desktop development with C++"
@@ -12,7 +12,7 @@
 #
 # Usage (from any PowerShell):
 #   powershell -ExecutionPolicy Bypass -File tools\windows\build-local.ps1
-#   ... -BuildType RelWithDebInfo -Compiler msvc -Clean -Target yuzu-cmd
+#   ... -BuildType RelWithDebInfo -Compiler msvc -Clean -Target yuzu
 
 param(
     [ValidateSet("Release", "RelWithDebInfo", "Debug")]
@@ -23,7 +23,7 @@ param(
 
     [string]$BuildDir = "build",
 
-    # Build only one target, e.g. "yuzu" (Qt app) or "yuzu-cmd" (eden-cli). Empty = everything.
+    # Build only one target, e.g. "yuzu" (fritchii.exe). Empty = everything.
     [string]$Target = "",
 
     [int]$Jobs = [Environment]::ProcessorCount,
