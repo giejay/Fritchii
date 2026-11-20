@@ -465,6 +465,7 @@ private:
     void UpdateStatusButtons();
     void UpdateUISettings();
     void UpdateInputDrivers();
+    void UpdateControllerAutoAssign(bool force);
     void HideMouseCursor();
     void ShowMouseCursor();
     void OpenURL(const QUrl& url);
@@ -566,6 +567,7 @@ private:
 #endif
     QTimer mouse_hide_timer;
     QTimer update_input_timer;
+    u64 input_device_generation{~0ULL};
 
     QString startup_icon_theme;
 

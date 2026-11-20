@@ -10,6 +10,7 @@
 #include <string>
 #include "common/container/unordered_map.h"
 #include <vector>
+#include "common/common_types.h"
 
 namespace Common {
 class ParamPackage;
@@ -166,6 +167,10 @@ public:
 
     /// Signals SDL driver for new input events
     void PumpEvents() const;
+
+    /// Returns a counter that changes whenever a game controller is connected or disconnected.
+    /// Frontends can poll this to react to hot-plug events.
+    [[nodiscard]] u64 GetDeviceGeneration() const;
 
 private:
     struct Impl;

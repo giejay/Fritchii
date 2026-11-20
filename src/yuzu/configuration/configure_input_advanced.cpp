@@ -4,11 +4,18 @@
 // SPDX-FileCopyrightText: Copyright 2020 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <QCheckBox>
 #include <QColorDialog>
+#include <QComboBox>
+#include <QGridLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QSpinBox>
 #include "common/settings.h"
 #include "core/core.h"
 #include "hid_core/frontend/emulated_controller.h"
 #include "hid_core/hid_core.h"
+#include "input_common/helpers/auto_assign.h"
 #include "qt_common/qt_compat.h"
 #include "ui_configure_input_advanced.h"
 #include "yuzu/configuration/configure_input_advanced.h"
@@ -102,7 +109,44 @@ ConfigureInputAdvanced::ConfigureInputAdvanced(Core::HID::HIDCore& hid_core_, QW
     ui->disable_wgi_xinput->setVisible(false);
 #endif
 
+    SetupAutoAssignUI();
     LoadConfiguration();
+}
+
+void ConfigureInputAdvanced::SetupAutoAssignUI() {
+    auto* grid = qobject_cast<QGridLayout*>(ui->controller_navigation->parentWidget()->layout());
+    if (grid == nullptr) {
+        return;
+    }
+
+    auto_assign_enabled = new QCheckBox(tr("Automatically assign connected controllers to players"));
+    auto_assign_enabled->setToolTip(
+        tr("Every connected controller gets the next free player slot, also while a game is "
+           "running. Controllers keep their slot until they are disconnected."));
+
+    auto_assign_profile = new QComboBox;
+    auto_assign_profile->addItem(tr("Automatic (standard gamepad layout)"), QString{});
+    for (const auto& name : InputCommon::GetAutoAssignProfileNames()) {
+        const auto qname = QString::fromStdString(name);
+        auto_assign_profile->addItem(qname, qname);
+    }
+
+    auto_assign_max_players = new QSpinBox;
+    auto_assign_max_players->setRange(1, 8);
+
+    auto* options = new QWidget;
+    auto* options_layout = new QHBoxLayout(options);
+    options_layout->setContentsMargins(20, 0, 0, 0);
+    options_layout->addWidget(new QLabel(tr("Profile:")));
+    options_layout->addWidget(auto_assign_profile, 1);
+    options_layout->addWidget(new QLabel(tr("Max players:")));
+    options_layout->addWidget(auto_assign_max_players);
+
+    const int row = grid->rowCount();
+    grid->addWidget(auto_assign_enabled, row, 0, 1, grid->columnCount());
+    grid->addWidget(options, row + 1, 0, 1, grid->columnCount());
+
+    connect(auto_assign_enabled, &QCheckBox::toggled, options, &QWidget::setEnabled);
 }
 
 ConfigureInputAdvanced::~ConfigureInputAdvanced() = default;
@@ -148,6 +192,13 @@ void ConfigureInputAdvanced::ApplyConfiguration() {
     Settings::values.enable_joycon_driver = ui->enable_joycon_driver->isChecked();
     Settings::values.enable_procon_driver = ui->enable_procon_driver->isChecked();
     Settings::values.random_amiibo_id = ui->random_amiibo_id->isChecked();
+    if (auto_assign_enabled != nullptr) {
+        Settings::values.auto_assign_controllers = auto_assign_enabled->isChecked();
+        Settings::values.auto_assign_profile =
+            auto_assign_profile->currentData().toString().toStdString();
+        Settings::values.auto_assign_max_players =
+            static_cast<u8>(auto_assign_max_players->value());
+    }
 }
 
 void ConfigureInputAdvanced::LoadConfiguration() {
@@ -184,6 +235,14 @@ void ConfigureInputAdvanced::LoadConfiguration() {
     ui->enable_joycon_driver->setChecked(Settings::values.enable_joycon_driver.GetValue());
     ui->enable_procon_driver->setChecked(Settings::values.enable_procon_driver.GetValue());
     ui->random_amiibo_id->setChecked(Settings::values.random_amiibo_id.GetValue());
+    if (auto_assign_enabled != nullptr) {
+        auto_assign_enabled->setChecked(Settings::values.auto_assign_controllers.GetValue());
+        const auto profile = QString::fromStdString(Settings::values.auto_assign_profile.GetValue());
+        const int index = auto_assign_profile->findData(profile);
+        auto_assign_profile->setCurrentIndex(index >= 0 ? index : 0);
+        auto_assign_max_players->setValue(Settings::values.auto_assign_max_players.GetValue());
+        auto_assign_profile->parentWidget()->setEnabled(auto_assign_enabled->isChecked());
+    }
 
     UpdateUIEnabled();
 }

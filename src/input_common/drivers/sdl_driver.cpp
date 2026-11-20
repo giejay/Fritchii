@@ -647,10 +647,12 @@ void SDLDriver::HandleGameControllerEvent(const SDL_Event& event) {
     case SDL_EVENT_JOYSTICK_REMOVED:
         LOG_DEBUG(Input, "Controller removed with Instance_ID {}", event.jdevice.which);
         CloseJoystick(SDL_GetJoystickFromID(event.jdevice.which));
+        device_generation.fetch_add(1, std::memory_order_release);
         break;
     case SDL_EVENT_JOYSTICK_ADDED:
         LOG_DEBUG(Input, "Controller connected with device index {}", event.jdevice.which);
         InitJoystick(event.jdevice.which);
+        device_generation.fetch_add(1, std::memory_order_release);
         break;
     }
 }

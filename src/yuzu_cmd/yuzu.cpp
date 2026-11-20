@@ -45,7 +45,9 @@
 #include "core/hle/service/filesystem/filesystem.h"
 #include "core/loader/loader.h"
 #include "frontend_common/config.h"
+#include "hid_core/hid_core.h"
 #include "input_common/drivers/keyboard.h"
+#include "input_common/helpers/auto_assign.h"
 #include "input_common/main.h"
 #include "network/network.h"
 #include "sdl_config.h"
@@ -250,7 +252,20 @@ struct SdlState {
     InputCommon::InputSubsystem input_subsystem{};
     std::unique_ptr<EmuWindow_SDL3> emu_window;
     bool network_initialized{};
+    u64 input_device_generation{~0ULL};
 };
+
+// Re-runs controller auto-assignment whenever a controller is connected or removed.
+static void UpdateControllerAutoAssign(SdlState& state) {
+    const u64 generation = state.input_subsystem.GetDeviceGeneration();
+    if (generation == state.input_device_generation) {
+        return;
+    }
+    state.input_device_generation = generation;
+    if (InputCommon::AutoAssignControllers(state.input_subsystem) && state.system.IsPoweredOn()) {
+        state.system.HIDCore().ReloadInputDevices();
+    }
+}
 
 static std::atomic_bool pack_nup_cancel{false};
 static std::atomic_bool unpack_nup_cancel{false};
@@ -510,6 +525,7 @@ extern "C" SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
     Service::AM::FrontendAppletParameters load_parameters{
         .applet_id = Service::AM::AppletId::Application,
     };
+    UpdateControllerAutoAssign(*state);
     const Core::SystemResultStatus load_result = state->system.Load(*state->emu_window, lp.filepath, load_parameters);
     switch (load_result) {
     case Core::SystemResultStatus::Success:
@@ -650,6 +666,7 @@ static void RunKeyScript(InputCommon::InputSubsystem& input_subsystem) {
 extern "C" SDL_AppResult SDL_AppIterate(void *appstate) {
     SdlState *state = (SdlState *)appstate;
     RunKeyScript(state->input_subsystem);
+    UpdateControllerAutoAssign(*state);
     if (state->emu_window) {
         state->emu_window->ApplyPendingTitle();
     }
