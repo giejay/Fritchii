@@ -330,6 +330,30 @@ struct InputSubsystem::Impl {
 #endif
     }
 
+    std::optional<Common::ParamPackage> TakeAssignRequest() const {
+#ifdef HAVE_SDL3
+        return sdl ? sdl->TakeAssignRequest() : std::nullopt;
+#else
+        return std::nullopt;
+#endif
+    }
+
+    void SetMenuDevice(std::optional<Common::ParamPackage> device) const {
+#ifdef HAVE_SDL3
+        if (sdl) {
+            sdl->SetMenuDevice(std::move(device));
+        }
+#endif
+    }
+
+    std::vector<MenuButton> TakeMenuButtons() const {
+#ifdef HAVE_SDL3
+        return sdl ? sdl->TakeMenuButtons() : std::vector<MenuButton>{};
+#else
+        return {};
+#endif
+    }
+
     u64 GetDeviceGeneration() const {
 #ifdef HAVE_SDL3
         return sdl ? sdl->GetDeviceGeneration() : 0;
@@ -501,6 +525,18 @@ void InputSubsystem::PumpEvents() const {
 
 u64 InputSubsystem::GetDeviceGeneration() const {
     return impl->GetDeviceGeneration();
+}
+
+std::optional<Common::ParamPackage> InputSubsystem::TakeAssignRequest() const {
+    return impl->TakeAssignRequest();
+}
+
+void InputSubsystem::SetMenuDevice(std::optional<Common::ParamPackage> device) const {
+    impl->SetMenuDevice(std::move(device));
+}
+
+std::vector<MenuButton> InputSubsystem::TakeMenuButtons() const {
+    return impl->TakeMenuButtons();
 }
 
 std::string GenerateKeyboardParam(int key_code) {

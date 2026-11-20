@@ -18,6 +18,8 @@ add_executable(yuzu
     Info.plist
     about_dialog.cpp
     about_dialog.h
+    controller_assign_dialog.cpp
+    controller_assign_dialog.h
     aboutdialog.ui
     applets/qt_amiibo_settings.cpp
     applets/qt_amiibo_settings.h

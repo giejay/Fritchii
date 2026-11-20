@@ -7,7 +7,13 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <mutex>
+#include <optional>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 #include <thread>
 #include "common/container/unordered_map.h"
 
@@ -15,6 +21,7 @@
 
 #include "common/common_types.h"
 #include "common/threadsafe_queue.h"
+#include "input_common/helpers/auto_assign.h"
 #include "input_common/input_engine.h"
 
 union SDL_Event;
@@ -58,6 +65,15 @@ public:
     u64 GetDeviceGeneration() const {
         return device_generation.load(std::memory_order_acquire);
     }
+
+    /// Returns the controller that held L + R + Start since the last call, if any.
+    std::optional<Common::ParamPackage> TakeAssignRequest();
+
+    /// Routes menu button presses of this controller to TakeMenuButtons(). nullopt stops it.
+    void SetMenuDevice(std::optional<Common::ParamPackage> device);
+
+    /// Returns the menu button presses received since the last call.
+    std::vector<MenuButton> TakeMenuButtons();
 
     ButtonMapping GetButtonMappingForDevice(const Common::ParamPackage& params) override;
     AnalogMapping GetAnalogMappingForDevice(const Common::ParamPackage& params) override;
@@ -124,6 +140,19 @@ private:
 
     std::atomic<bool> initialized = false;
     std::atomic<u64> device_generation = 0;
+
+    /// Marks a controller as used (it pressed a button). Ghost/virtual pads never get here.
+    void MarkActive(const std::shared_ptr<SDLJoystick>& joystick);
+    void HandleGamepadButtonDown(const std::shared_ptr<SDLJoystick>& joystick,
+                                 SDL_GamepadButton button);
+
+    using PadKey = std::pair<std::string, int>;
+    mutable std::mutex activity_mutex;
+    std::set<PadKey> active_pads;
+    std::optional<Common::ParamPackage> assign_request;
+    std::chrono::steady_clock::time_point last_assign_request{};
+    std::optional<PadKey> menu_device;
+    std::vector<MenuButton> menu_buttons;
     bool start_thread;
 };
 } // namespace InputCommon

@@ -121,7 +121,14 @@ void ConfigureInputAdvanced::SetupAutoAssignUI() {
     auto_assign_enabled = new QCheckBox(tr("Automatically assign connected controllers to players"));
     auto_assign_enabled->setToolTip(
         tr("Every connected controller gets the next free player slot, also while a game is "
-           "running. Controllers keep their slot until they are disconnected."));
+           "running. Controllers keep their slot until they are disconnected. Hold L + R + Start "
+           "on a controller to pick its player and profile yourself."));
+
+    auto_assign_require_input =
+        new QCheckBox(tr("Only assign a controller after it presses a button"));
+    auto_assign_require_input->setToolTip(
+        tr("Skips virtual controllers that streaming tools such as Sunshine or Steam leave "
+           "behind."));
 
     auto_assign_profile = new QComboBox;
     auto_assign_profile->addItem(tr("Automatic (standard gamepad layout)"), QString{});
@@ -141,9 +148,16 @@ void ConfigureInputAdvanced::SetupAutoAssignUI() {
     options_layout->addWidget(new QLabel(tr("Max players:")));
     options_layout->addWidget(auto_assign_max_players);
 
+    auto* require_row = new QWidget;
+    auto* require_layout = new QHBoxLayout(require_row);
+    require_layout->setContentsMargins(20, 0, 0, 0);
+    require_layout->addWidget(auto_assign_require_input);
+
     const int row = grid->rowCount();
     grid->addWidget(auto_assign_enabled, row, 0, 1, grid->columnCount());
-    grid->addWidget(options, row + 1, 0, 1, grid->columnCount());
+    grid->addWidget(require_row, row + 1, 0, 1, grid->columnCount());
+    grid->addWidget(options, row + 2, 0, 1, grid->columnCount());
+    connect(auto_assign_enabled, &QCheckBox::toggled, require_row, &QWidget::setEnabled);
 
     connect(auto_assign_enabled, &QCheckBox::toggled, options, &QWidget::setEnabled);
 }
@@ -193,6 +207,7 @@ void ConfigureInputAdvanced::ApplyConfiguration() {
     Settings::values.random_amiibo_id = ui->random_amiibo_id->isChecked();
     if (auto_assign_enabled != nullptr) {
         Settings::values.auto_assign_controllers = auto_assign_enabled->isChecked();
+        Settings::values.auto_assign_require_input = auto_assign_require_input->isChecked();
         Settings::values.auto_assign_profile =
             auto_assign_profile->currentData().toString().toStdString();
         Settings::values.auto_assign_max_players =
@@ -236,6 +251,9 @@ void ConfigureInputAdvanced::LoadConfiguration() {
     ui->random_amiibo_id->setChecked(Settings::values.random_amiibo_id.GetValue());
     if (auto_assign_enabled != nullptr) {
         auto_assign_enabled->setChecked(Settings::values.auto_assign_controllers.GetValue());
+        auto_assign_require_input->setChecked(
+            Settings::values.auto_assign_require_input.GetValue());
+        auto_assign_require_input->parentWidget()->setEnabled(auto_assign_enabled->isChecked());
         const auto profile = QString::fromStdString(Settings::values.auto_assign_profile.GetValue());
         const int index = auto_assign_profile->findData(profile);
         auto_assign_profile->setCurrentIndex(index >= 0 ? index : 0);

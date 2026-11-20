@@ -202,6 +202,43 @@ void ApplyAutomap(const InputSubsystem& input, Settings::PlayerInput& player,
     }
 }
 
+/// Writes bindings for the controller into the player. Returns true when the profile was used.
+bool ApplyMapping(const InputSubsystem& input, Settings::PlayerInput& player,
+                  const DeviceKey& key, const Common::ParamPackage& device,
+                  const std::string& profile_name) {
+    const bool used_profile = !profile_name.empty() && ApplyProfile(player, key, profile_name);
+    if (!used_profile) {
+        ApplyAutomap(input, player, device);
+    }
+    player.connected = true;
+    if (player.controller_type == Settings::ControllerType::Handheld) {
+        player.controller_type = Settings::ControllerType::ProController;
+    }
+    return used_profile;
+}
+
+bool IsActive(const Common::ParamPackage& device) {
+    return !Settings::values.auto_assign_require_input.GetValue() ||
+           device.Get("active", "1") == "1";
+}
+
+/// Connected SDL controllers (only the ones that pressed a button when that is required).
+std::vector<std::pair<DeviceKey, Common::ParamPackage>> GetUsableDevices(
+    const InputSubsystem& input) {
+    std::vector<std::pair<DeviceKey, Common::ParamPackage>> devices;
+    for (const auto& device : input.GetInputDevices()) {
+        if (device.Has("guid2") || !IsActive(device)) {
+            continue; // Combined dual Joy-Con entries are listed as single halves too.
+        }
+        if (auto key = KeyFromParam(device)) {
+            devices.emplace_back(std::move(*key), device);
+        }
+    }
+    std::sort(devices.begin(), devices.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+    return devices;
+}
+
 } // Anonymous namespace
 
 std::vector<std::string> GetAutoAssignProfileNames() {
@@ -233,18 +270,8 @@ bool AutoAssignControllers(const InputSubsystem& input_subsystem) {
     const std::string profile_name = Settings::values.auto_assign_profile.GetValue();
     auto& players = Settings::values.players.GetValue();
 
-    // Connected SDL controllers, in a stable order (by GUID, then by port).
-    std::vector<std::pair<DeviceKey, Common::ParamPackage>> connected;
-    for (const auto& device : input_subsystem.GetInputDevices()) {
-        if (device.Has("guid2")) {
-            continue; // Combined dual Joy-Con entries, the single halves are listed too.
-        }
-        if (auto key = KeyFromParam(device)) {
-            connected.emplace_back(std::move(*key), device);
-        }
-    }
-    std::sort(connected.begin(), connected.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
+    // Usable SDL controllers, in a stable order (by GUID, then by port).
+    const auto connected = GetUsableDevices(input_subsystem);
 
     const auto is_connected = [&connected](const DeviceKey& key) {
         return std::any_of(connected.begin(), connected.end(),
@@ -283,15 +310,7 @@ bool AutoAssignControllers(const InputSubsystem& input_subsystem) {
         }
 
         auto& player = players[next_slot];
-        const bool used_profile =
-            !profile_name.empty() && ApplyProfile(player, key, profile_name);
-        if (!used_profile) {
-            ApplyAutomap(input_subsystem, player, device);
-        }
-        player.connected = true;
-        if (player.controller_type == Settings::ControllerType::Handheld) {
-            player.controller_type = Settings::ControllerType::ProController;
-        }
+        const bool used_profile = ApplyMapping(input_subsystem, player, key, device, profile_name);
 
         LOG_INFO(Input, "Auto-assign: '{}' -> Player {} ({})", device.Get("display", "?"),
                  next_slot + 1, used_profile ? fmt::format("profile {}", profile_name)
@@ -317,6 +336,73 @@ bool AutoAssignControllers(const InputSubsystem& input_subsystem) {
     }
 
     return changed;
+}
+
+std::optional<std::size_t> FindPlayerForDevice(const Common::ParamPackage& device) {
+    const auto key = KeyFromParam(device);
+    if (!key) {
+        return std::nullopt;
+    }
+    const auto& players = Settings::values.players.GetValue();
+    for (std::size_t i = 0; i < MaxRegularPlayers; ++i) {
+        if (GetBoundDevice(players[i]) == key) {
+            return i;
+        }
+    }
+    return std::nullopt;
+}
+
+std::string GetPlayerControllerName(const InputSubsystem& input_subsystem,
+                                    std::size_t player_index) {
+    if (player_index >= MaxRegularPlayers) {
+        return {};
+    }
+    const auto bound = GetBoundDevice(Settings::values.players.GetValue()[player_index]);
+    if (!bound) {
+        return {};
+    }
+    for (const auto& device : input_subsystem.GetInputDevices()) {
+        if (KeyFromParam(device) == bound && !device.Has("guid2")) {
+            return device.Get("display", "");
+        }
+    }
+    return {};
+}
+
+bool AssignControllerToPlayer(const InputSubsystem& input_subsystem,
+                              const Common::ParamPackage& device, std::size_t player_index,
+                              const std::string& profile_name) {
+    const auto key = KeyFromParam(device);
+    if (!key || player_index >= MaxRegularPlayers) {
+        return false;
+    }
+    auto& players = Settings::values.players.GetValue();
+    const auto old_index = FindPlayerForDevice(device);
+
+    const Settings::PlayerInput previous = players[player_index];
+    const bool used_profile =
+        ApplyMapping(input_subsystem, players[player_index], *key, device, profile_name);
+
+    if (old_index && *old_index != player_index) {
+        // Swap: the controller that had the target slot moves to the slot this one came from.
+        auto& old_slot = players[*old_index];
+        old_slot.buttons = previous.buttons;
+        old_slot.analogs = previous.analogs;
+        old_slot.motions = previous.motions;
+        const auto previous_device = GetBoundDevice(previous);
+        bool previous_usable = false;
+        if (previous_device) {
+            for (const auto& [usable_key, usable] : GetUsableDevices(input_subsystem)) {
+                previous_usable |= usable_key == *previous_device;
+            }
+        }
+        old_slot.connected = *old_index == 0 || previous_usable;
+    }
+
+    LOG_INFO(Input, "Controller assign: '{}' -> Player {} ({})", device.Get("display", "?"),
+             player_index + 1,
+             used_profile ? fmt::format("profile {}", profile_name) : std::string{"automap"});
+    return true;
 }
 
 } // namespace InputCommon

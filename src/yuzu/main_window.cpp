@@ -197,6 +197,7 @@ static FileSys::VirtualFile VfsDirectoryCreateFileWrapper(const FileSys::Virtual
 #include "hid_core/frontend/emulated_controller.h"
 #include "hid_core/hid_core.h"
 #include "input_common/helpers/auto_assign.h"
+#include "yuzu/controller_assign_dialog.h"
 #include "input_common/drivers/virtual_amiibo.h"
 
 // Video Core //
@@ -6148,6 +6149,39 @@ void MainWindow::UpdateInputDrivers() {
         return;
     input_subsystem->PumpEvents();
     UpdateControllerAutoAssign(false);
+    HandleControllerAssignRequest();
+}
+
+void MainWindow::HandleControllerAssignRequest() {
+    if (!input_subsystem) {
+        return;
+    }
+    auto request = input_subsystem->TakeAssignRequest();
+    if (!request || !Settings::values.auto_assign_controllers.GetValue() ||
+        QApplication::activeModalWidget() != nullptr) {
+        return;
+    }
+
+    const bool pause = emulation_running && QtCommon::emu_thread &&
+                       QtCommon::emu_thread->IsRunning();
+    if (pause) {
+        LOG_INFO(Frontend, "Pausing: controller assignment window");
+        OnPauseGame();
+    }
+
+    QWidget* dialog_parent = render_window && render_window->isFullScreen()
+                                 ? static_cast<QWidget*>(render_window)
+                                 : static_cast<QWidget*>(this);
+    ControllerAssignDialog dialog(*input_subsystem, *request, dialog_parent);
+    if (dialog.exec() == QDialog::Accepted &&
+        InputCommon::AssignControllerToPlayer(*input_subsystem, *request, dialog.SelectedPlayer(),
+                                              dialog.SelectedProfile())) {
+        QtCommon::system->HIDCore().ReloadInputDevices();
+    }
+
+    if (pause && emulation_running) {
+        OnStartGame();
+    }
 }
 
 void MainWindow::UpdateControllerAutoAssign(bool force) {

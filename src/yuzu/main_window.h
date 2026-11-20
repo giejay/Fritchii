@@ -518,6 +518,7 @@ private:
     void UpdateUISettings();
     void UpdateInputDrivers();
     void UpdateControllerAutoAssign(bool force);
+    void HandleControllerAssignRequest();
     void HideMouseCursor();
     void ShowMouseCursor();
     void OpenURL(const QUrl& url);

@@ -50,6 +50,7 @@ private:
     std::unique_ptr<Ui::ConfigureInputAdvanced> ui;
 
     QCheckBox* auto_assign_enabled{};
+    QCheckBox* auto_assign_require_input{};
     QComboBox* auto_assign_profile{};
     QSpinBox* auto_assign_max_players{};
 
