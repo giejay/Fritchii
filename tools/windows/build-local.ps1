@@ -154,6 +154,18 @@ if ((Test-Path $cache) -and (Select-String -Path $cache -Pattern "^YUZU_USE_BUND
     Remove-Item -Recurse -Force (Join-Path $BuildDir "CMakeFiles") -ErrorAction SilentlyContinue
 }
 
+# Code Qt generates (moc/uic/rcc) is only regenerated when its sources change, so after switching
+# Qt it still comes from the old version and fails to compile. Drop it when the Qt folder changes.
+$qtMarker = Join-Path $BuildDir ".fritchii-qt-dir"
+$previousQt = if (Test-Path $qtMarker) { (Get-Content $qtMarker -Raw).Trim() } else { "" }
+if ((Test-Path $BuildDir) -and ($previousQt -ne $QtDir)) {
+    Write-Host "build-local: Qt changed, removing Qt-generated code from $BuildDir"
+    Get-ChildItem $BuildDir -Recurse -Directory -Filter "*_autogen" -ErrorAction SilentlyContinue |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+}
+New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
+Set-Content -Path $qtMarker -Value $QtDir
+
 $configureArgs = @(
     "-S", ".", "-B", $BuildDir, "-G", "Ninja",
     "-DCMAKE_BUILD_TYPE=$BuildType",
