@@ -57,6 +57,15 @@ if (-not $env:VULKAN_SDK -or -not (Test-Path $env:VULKAN_SDK)) {
 }
 Write-Host "build-local: Vulkan SDK: $env:VULKAN_SDK"
 
+# The shader compiler ships in the SDK's Bin folder, which isn't on PATH until a new login.
+$vulkanBin = Join-Path $env:VULKAN_SDK "Bin"
+if (-not (Get-Command glslangValidator -ErrorAction SilentlyContinue)) {
+    $env:PATH = "$vulkanBin;$env:PATH"
+}
+if (-not (Get-Command glslangValidator -ErrorAction SilentlyContinue)) {
+    Fail "glslangValidator.exe not found in $vulkanBin. Reinstall the Vulkan SDK (tools\windows\install-vulkan-sdk.ps1)."
+}
+
 # Visual Studio environment (puts cl/clang-cl, and VS's bundled cmake + ninja on PATH)
 if (-not $env:VCINSTALLDIR) {
     & "$PSScriptRoot\load-msvc-env.ps1"
