@@ -3,22 +3,27 @@
 
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <string>
+#include <vector>
 
 #include <QDialog>
+#include <QString>
 #include <QTimer>
 
 #include "common/param_package.h"
 
-class QComboBox;
+class QLabel;
+class QPushButton;
 
 namespace InputCommon {
 class InputSubsystem;
 }
 
-/// Opened with L + R + Start: picks the player slot and profile for the controller that pressed
-/// it. That controller drives the window (D-pad, A to confirm, B to cancel).
+/// Opened with L + R + Start: a full-window overlay that picks the player slot and profile for
+/// the controller that pressed it. That controller drives it (D-pad, A to confirm, B to cancel);
+/// mouse and keyboard work too.
 class ControllerAssignDialog : public QDialog {
 public:
     explicit ControllerAssignDialog(InputCommon::InputSubsystem& input_subsystem,
@@ -28,14 +33,32 @@ public:
     std::size_t SelectedPlayer() const;
     std::string SelectedProfile() const;
 
+protected:
+    void paintEvent(QPaintEvent* event) override;
+    void showEvent(QShowEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
+
 private:
+    enum class Row { Player, Profile, Buttons };
+
     void PollController();
-    void FocusRow(int row);
+    void Move(int dx, int dy);
+    void Activate();
+    void UpdateView();
 
     InputCommon::InputSubsystem& input_subsystem;
     Common::ParamPackage device;
-    QComboBox* player_box{};
-    QComboBox* profile_box{};
+
+    std::array<QPushButton*, 8> player_tiles{};
+    QLabel* profile_label{};
+    QPushButton* profile_box{};
+    QPushButton* confirm_button{};
+    QPushButton* cancel_button{};
     QTimer poll_timer;
-    int focused_row{};
+
+    std::vector<std::pair<QString, QString>> profiles; // label, profile name ("" = automatic)
+    int player{};
+    int profile{};
+    int button{}; // 0 = confirm, 1 = cancel
+    Row row{Row::Player};
 };
