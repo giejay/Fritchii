@@ -193,3 +193,7 @@ Your compiled executable will be in:
 ## Scripts
 
 Take a look at our [CI scripts](https://github.com/Eglantine-CI/Workflow). You can use `.ci/common/configure.sh` on any POSIX-compliant shell, but you are heavily encouraged to instead write your own based. It's not really that hard, provided you can read CMake.
+
+### Windows quick build
+
+`build-windows.cmd` in the repository root (or `tools/windows/build-local.ps1`) loads the Visual Studio environment, finds the Vulkan SDK, configures with Ninja (clang-cl when installed, otherwise MSVC) and builds both the Qt app and eden-cli into `build/bin`. Run it with `-?`-style parameters such as `-BuildType RelWithDebInfo`, `-Compiler msvc`, `-Target yuzu-cmd` or `-Clean`.
