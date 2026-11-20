@@ -389,6 +389,28 @@ endif()
 target_link_libraries(yuzu PRIVATE nlohmann_json::nlohmann_json)
 target_link_libraries(yuzu PRIVATE common core input_common frontend_common network video_core qt_common)
 target_link_libraries(yuzu PRIVATE Boost::headers Qt6::Widgets Qt6::Charts Qt6::Concurrent Qt6::Network)
+
+# The Fritchii UI renders its icons through Qt's SVG image plugin. A shared Qt loads that plugin
+# at runtime (windeployqt copies it), but a static Qt (the bundled one on Windows) only has it
+# when it is linked in.
+if (YUZU_STATIC_BUILD)
+    find_package(Qt6 QUIET OPTIONAL_COMPONENTS Svg)
+    if (TARGET Qt6::Svg)
+        target_link_libraries(yuzu PRIVATE Qt6::Svg)
+        set(_fritchii_svg_plugins)
+        foreach (_plugin Qt6::QSvgPlugin Qt6::QSvgIconPlugin)
+            if (TARGET ${_plugin})
+                list(APPEND _fritchii_svg_plugins ${_plugin})
+            endif()
+        endforeach()
+        if (_fritchii_svg_plugins)
+            qt_import_plugins(yuzu INCLUDE ${_fritchii_svg_plugins})
+        endif()
+    else()
+        message(WARNING "Static Qt without the Svg module: Fritchii's icons will be missing. "
+                        "Use a shared Qt (-DYUZU_USE_BUNDLED_QT=OFF) instead.")
+    endif()
+endif()
 # Unpacks NVIDIA's files from the Streamline release (nvidia_dlss_panel.cpp).
 target_link_libraries(yuzu PRIVATE ZLIB::ZLIB)
 target_link_libraries(yuzu PRIVATE ${PLATFORM_LIBRARIES} Threads::Threads)
