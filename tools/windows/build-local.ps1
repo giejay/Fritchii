@@ -81,7 +81,13 @@ foreach ($tool in @("cmake", "ninja")) {
 }
 
 if ($Compiler -eq "auto") {
-    $Compiler = if (Get-Command clang-cl -ErrorAction SilentlyContinue) { "clang-cl" } else { "msvc" }
+    if (-not (Get-Command clang-cl -ErrorAction SilentlyContinue)) {
+        Fail ("clang-cl not found. Fritchii releases are built with clang-cl; plain MSVC turns some " +
+              "warnings into errors that upstream code doesn't avoid. Add the 'C++ Clang tools for " +
+              "Windows' component (Microsoft.VisualStudio.Component.VC.Llvm.Clang) in the Visual " +
+              "Studio Installer, or pass -Compiler msvc to try MSVC anyway.")
+    }
+    $Compiler = "clang-cl"
 }
 if ($Compiler -eq "clang-cl") {
     if (-not (Get-Command clang-cl -ErrorAction SilentlyContinue)) {
